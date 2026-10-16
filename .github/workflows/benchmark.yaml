@@ -47,7 +47,7 @@ jobs:
       - name: Add benchmark report to Actions summary
         if: always()
         env:
-          PAGES_BASE_URL: https://dariakaraseva.github.io/CV_labs
+          PAGES_BASE_URL: https://dddashhh.github.io/CV_labs
         run: python python/report.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload benchmark results

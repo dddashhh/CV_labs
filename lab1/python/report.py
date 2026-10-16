@@ -2,12 +2,11 @@ import csv
 import os
 
 R = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results"))
-REPO_ROOT = os.path.dirname(R)
+IMG_DIR = os.path.join(R, "images")
 PAGES_BASE = os.environ.get(
     "PAGES_BASE_URL",
-    "https://dariakaraseva.github.io/CV_labs",
+    "https://dddashhh.github.io/CV_labs",
 )
-IMG_DIR = os.path.join(R, "images")
 
 
 def load(name):
