@@ -1,3 +1,5 @@
+name: Lab 1 — Benchmark
+
 on:
   push:
     paths:
@@ -6,10 +8,11 @@ on:
   pull_request:
     paths:
       - 'lab1/**'
+      - '.github/workflows/benchmark.yaml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   benchmark:
@@ -18,6 +21,7 @@ jobs:
     defaults:
       run:
         working-directory: lab1
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +46,8 @@ jobs:
 
       - name: Add benchmark report to Actions summary
         if: always()
+        env:
+          PAGES_BASE_URL: https://dariakaraseva.github.io/CV_labs
         run: python python/report.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload benchmark results
@@ -56,3 +62,13 @@ jobs:
             lab1/results/images/*.png
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish results to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: lab1/results
+          publish_branch: gh-pages
+          destination_dir: lab1
+          keep_files: true

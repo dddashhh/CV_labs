@@ -2,8 +2,12 @@ import csv
 import os
 
 R = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results"))
-IMG_DIR = os.path.join(R, "images")
 REPO_ROOT = os.path.dirname(R)
+PAGES_BASE = os.environ.get(
+    "PAGES_BASE_URL",
+    "https://dariakaraseva.github.io/CV_labs",
+)
+IMG_DIR = os.path.join(R, "images")
 
 
 def load(name):
@@ -33,18 +37,15 @@ def markdown_table(rows, columns):
 
 def print_panels():
     if not os.path.isdir(IMG_DIR):
-        panels = []
-    else:
-        panels = sorted(f for f in os.listdir(IMG_DIR) if f.endswith("_panel.png"))
+        print("_Нет изображений._\n"); return
+    panels = sorted(f for f in os.listdir(IMG_DIR) if f.endswith("_panel.png"))
     if not panels:
-        print("_Нет изображений._\n")
-        return
+        print("_Нет изображений._\n"); return
     for name in panels:
         label = name[:-len("_panel.png")]
-        rel = os.path.relpath(os.path.join(IMG_DIR, name), REPO_ROOT)
+        url = f"{PAGES_BASE}/lab1/images/{name}"
         print(f"**{label}**\n")
-        print(f'<img src="{rel}" alt="{label}" width="800">\n')
-
+        print(f'<img src="{url}" alt="{label}" width="800">\n')
 
 def main():
     print("# Benchmark report — Python image processing\n")
