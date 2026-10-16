@@ -34,6 +34,11 @@ def markdown_table(rows, columns):
     return "\n".join(out) + "\n"
 
 
+def image(name, alt=None, width=800):
+    alt = alt or name
+    return f'<img src="{PAGES_BASE}/lab1/{name}" alt="{alt}" width="{width}">\n'
+
+
 def print_panels():
     if not os.path.isdir(IMG_DIR):
         print("_Нет изображений._\n"); return
@@ -42,12 +47,27 @@ def print_panels():
         print("_Нет изображений._\n"); return
     for name in panels:
         label = name[:-len("_panel.png")]
-        url = f"{PAGES_BASE}/lab1/images/{name}"
         print(f"**{label}**\n")
-        print(f'<img src="{url}" alt="{label}" width="800">\n')
+        print(image(f"images/{name}", alt=label))
+
 
 def main():
     print("# Benchmark report — Python image processing\n")
+
+    print("## Краткая теория\n")
+    print(
+        "**Бинаризация** переводит полутоновое изображение в чёрно-белое: "
+        "каждый пиксель сравнивается с порогом `t`, и результат равен 255 или 0. "
+        "Порог можно задать вручную или вычислить автоматически методом Оцу — "
+        "он выбирает `t`, максимизирующий межклассовую дисперсию яркостей "
+        "переднего и заднего планов.\n"
+    )
+    print(
+        "**Дилатация** — морфологическая операция, которая для каждого пикселя "
+        "берёт максимум по окрестности 3×3. Белые области «разрастаются» на один "
+        "пиксель в каждую сторону, мелкие тёмные разрывы внутри объектов "
+        "заполняются. Формально: `dst(x, y) = max{ src(x+dx, y+dy) : |dx|, |dy| ≤ 1 }`.\n"
+    )
 
     print("## Примеры обработки\n")
     print("Слева направо: original (gray), binary, dilated 3×3, difference.\n")
@@ -63,6 +83,7 @@ def main():
         ("Native equal", "native_equal"),
         ("Pillow equal", "pil_equal"),
     ]))
+    print(image("benchmark.png", alt="Дилатация 3×3: медианное время"))
 
     print("## Бинаризация + дилатация\n")
     print(markdown_table(load("bench_pipeline.csv"), [
