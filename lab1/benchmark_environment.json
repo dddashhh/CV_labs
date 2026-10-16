@@ -1,0 +1,31 @@
+{
+  "python": "3.12.15 (main, Oct  1 2026, 02:35:59) [GCC 13.3.0]",
+  "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "processor": "x86_64",
+  "opencv": "5.0.0",
+  "numpy": "2.5.4",
+  "pillow": "12.3.0",
+  "sizes": [
+    64,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "generated_classes": [
+    "geometry",
+    "checkerboard",
+    "sparse",
+    "uniform_black",
+    "uniform_white"
+  ],
+  "loaded_classes": [
+    "dog_photo_gallai",
+    "dog_photo_bluz",
+    "dog_mask"
+  ],
+  "library_repeats": 7,
+  "native_repeats": 3,
+  "timing_clock": "time.perf_counter_ns",
+  "memory_metric": "tracemalloc peak Python-tracked bytes; excludes native allocations"
+}
