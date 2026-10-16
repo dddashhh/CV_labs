@@ -1,0 +1,51 @@
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
+      - name: Install Python dependencies
+        run: python -m pip install -r python/requirements.txt
+
+      - name: Process test image
+        run: python python/main.py images/test.png --thresh 127
+
+      - name: Run correctness tests and benchmarks
+        run: python python/benchmark.py
+
+      - name: Generate plots
+        if: always()
+        run: python python/plot.py
+
+      - name: Add benchmark report to Actions summary
+        if: always()
+        run: python python/report.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-benchmark-${{ github.sha }}
+          path: |
+            results/*.csv
+            results/*.json
+            results/*.png
+            results/images/*.png
+          if-no-files-found: error
+          retention-days: 30
