@@ -1,0 +1,8 @@
+-r requirements-test.txt
+omegaconf==2.3.0
+einops==0.7.0
+timm==0.9.16
+loralib==0.1.2
+scipy==1.11.4
+lpips==0.1.4
+piq==0.8.0
