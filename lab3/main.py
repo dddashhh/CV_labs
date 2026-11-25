@@ -52,8 +52,12 @@ def run(data, out, ids, degradations, mask_names, device, seed, baseline_only=Fa
                              'outside_max_error': preservation(prediction, ref, mask),
                              'seconds': elapsed})
                 save_image(out / 'images' / degradation / identifier / f'{name}.png', prediction)
-                print(identifier, degradation, name, f'PSNR={rows[-1]["psnr_db"]:.3f}', flush=True)
-    write_csv(out / 'metrics.csv', rows)
+                write_csv(out / 'metrics.csv', rows)
+                row = rows[-1]
+                values = ' '.join(f'{key}={row[key]:.3f}' for key in
+                                  ('psnr_db', 'lpips', 'clip_iqa', 'psnr_roi_db', 'seconds')
+                                  if row[key] is not None)
+                print(identifier, degradation, name, values, flush=True)
     metadata = {'ids': list(ids), 'degradations': list(degradations), 'masks': list(mask_names),
                 'seed': seed, 'device': device, 'known_source': 'none' if baseline_only else 'hr_outside_mask', 'baseline_only': baseline_only, 'psnr_only': psnr_only,
                 'python': platform.python_version(), 'numpy': np.__version__}
