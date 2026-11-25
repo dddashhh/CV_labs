@@ -1,4 +1,4 @@
-from lab3.ci_report import experiment_report, junit_report, write_html
+from lab3.ci_report import experiment_report, junit_report, write_html, write_markdown
 
 
 def test_junit_summary(tmp_path):
@@ -22,3 +22,10 @@ def test_experiment_summary(tmp_path):
     write_html(tmp_path)
     assert 'figures/0801.png' in (tmp_path / 'report.html').read_text()
     assert 'не сформирован' in experiment_report(tmp_path / 'absent')
+
+
+def test_markdown_file(tmp_path):
+    path = tmp_path / 'report.md'
+    figure = tmp_path / 'figures' / 'psnr_db.png'
+    write_markdown(path, '## Отчёт\n', [figure])
+    assert path.read_text(encoding='utf-8') == '## Отчёт\n\n### Графики и изображения\n\n![psnr_db](figures/psnr_db.png)\n'

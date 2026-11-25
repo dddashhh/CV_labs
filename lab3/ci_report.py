@@ -8,8 +8,8 @@ from pathlib import Path
 
 COLUMNS = (
     ('Деградация', 'degradation'), ('Маска', 'mask'), ('N', 'n'),
-    ('PSNR, дБ ↑', 'psnr_db'), ('LPIPS ↓', 'lpips'), ('CLIP-IQA ↑', 'clip_iqa'),
-    ('PSNR ROI, дБ ↑', 'psnr_roi_db'), ('Ошибка вне маски', 'outside_max_error'),
+    ('PSNR, дБ', 'psnr_db'), ('LPIPS', 'lpips'), ('CLIP-IQA', 'clip_iqa'),
+    ('PSNR ROI, дБ', 'psnr_roi_db'), ('Ошибка вне маски', 'outside_max_error'),
     ('Время, с', 'seconds'),
 )
 ROI_COLUMNS = (
@@ -118,16 +118,31 @@ def write_html(out):
     (out / 'report.html').write_text('\n'.join(sections), encoding='utf-8')
 
 
+def write_markdown(path, content, figures=()):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    links = [f"![{figure.stem}](figures/{figure.name})" for figure in figures]
+    if links:
+        content += "\n### Графики и изображения\n\n" + "\n\n".join(links) + "\n"
+    path.write_text(content, encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=('tests', 'experiments'))
     parser.add_argument('path', type=Path)
     parser.add_argument('--html', action='store_true')
+    parser.add_argument('--markdown', type=Path)
     args = parser.parse_args()
     if args.mode == 'tests':
-        print(junit_report(args.path))
+        content = junit_report(args.path)
+        print(content)
+        if args.markdown:
+            write_markdown(args.markdown, content)
     else:
-        print(experiment_report(args.path))
+        content = experiment_report(args.path)
+        print(content)
+        if args.markdown:
+            write_markdown(args.markdown, content, sorted((args.path / 'figures').glob('*.png')))
         if args.html and (args.path / 'summary.csv').exists():
             write_html(args.path)
 

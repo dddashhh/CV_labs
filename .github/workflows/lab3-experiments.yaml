@@ -10,6 +10,19 @@ on:
           - smoke
           - full
         default: smoke
+      real_model:
+        description: Run additional pretrained integration test
+        type: boolean
+        default: false
+
+  workflow_call:
+    inputs:
+      scope:
+        type: string
+        default: smoke
+      real_model:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,28 +35,138 @@ jobs:
       OMP_NUM_THREADS: '2'
       MKL_NUM_THREADS: '2'
       MPLBACKEND: Agg
+
+    outputs:
+      artifact_name: ${{ steps.name.outputs.value }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: |
             lab3/requirements.txt
             lab3/requirements-test.txt
+
       - run: python -m pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu
+
       - run: python -m pip install -r lab3/requirements.txt
-      - run: python -m lab3.setup_model
-      - name: Download DIV2K and run smoke experiment
-        if: inputs.scope == 'smoke'
-        run: python -m lab3.main --ids 0801 --degradations severe --device cpu --out lab3/results/github
-      - name: Download DIV2K and run full experiment
-        if: inputs.scope == 'full'
-        run: python -m lab3.main --device cpu --out lab3/results/github
-      - name: Upload results
+
+      - name: Download ResShift
+        run: python -m lab3.setup_model
+
+      - name: Download DIV2K and run experiments
+        env:
+          SCOPE: ${{ inputs.scope }}
+        run: |
+          case "$SCOPE" in
+            smoke) python -m lab3.main --ids 0801 --degradations severe --device cpu --out lab3/results/github ;;
+            full) python -m lab3.main --device cpu --out lab3/results/github ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Test pretrained model
+        if: inputs.real_model
+        env:
+          LAB3_REAL_MODEL: '1'
+        run: python -m pytest lab3/tests/test_pretrained.py -v -s --junitxml=lab3/results/github/pretrained.xml
+
+      - name: Add experiment report to Summary
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          python -m lab3.ci_report experiments lab3/results/github --html --markdown lab3/results/github/report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f lab3/results/github/pretrained.xml ]; then
+            python -m lab3.ci_report tests lab3/results/github/pretrained.xml | tee -a lab3/results/github/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Artifact name
+        if: always()
+        id: name
+        env:
+          SCOPE: ${{ inputs.scope }}
+        run: echo "value=lab3-${SCOPE}-results-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload results and images
+        if: always()
+        id: upload
+        uses: actions/upload-artifact@v6
         with:
-          name: lab3-${{ inputs.scope }}-results
+          name: ${{ steps.name.outputs.value }}
           path: lab3/results/github/
           if-no-files-found: warn
+          retention-days: 30
+
+      - name: Link to results
+        if: always() && steps.upload.outputs.artifact-url != ''
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: printf '\n[Скачать изображения, графики, CSV, Markdown и HTML-отчёт](%s)\n' "$ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: experiments
+    if: github.ref == 'refs/heads/main' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      actions: read
+
+    concurrency:
+      group: lab3-publish-${{ github.repository }}
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.experiments.outputs.artifact_name }}
+          path: lab3/results/github
+
+      - name: Prepare public figures
+        env:
+          PUBLISH_PANELS: ${{ vars.LAB3_PUBLISH_PANELS }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/lab3-public"
+          for name in psnr_db lpips clip_iqa psnr_roi_db seconds; do
+            file="lab3/results/github/figures/$name.png"
+            if [ -f "$file" ]; then cp "$file" "$RUNNER_TEMP/lab3-public/"; fi
+          done
+          if [ "$PUBLISH_PANELS" = 'true' ]; then
+            for file in lab3/results/github/figures/0*.png; do
+              if [ -f "$file" ]; then cp "$file" "$RUNNER_TEMP/lab3-public/"; fi
+            done
+          fi
+          test -n "$(ls -A "$RUNNER_TEMP/lab3-public")"
+
+      - name: Prepare public Markdown report
+        run: |
+          python -m lab3.ci_report experiments lab3/results/github > "$RUNNER_TEMP/lab3-public/report.md"
+          printf '\n### Графики\n\n' >> "$RUNNER_TEMP/lab3-public/report.md"
+          for file in "$RUNNER_TEMP/lab3-public"/*.png; do
+            name="$(basename "$file")"
+            printf '![%s](%s)\n\n' "$name" "$name" >> "$RUNNER_TEMP/lab3-public/report.md"
+          done
+
+      - name: Publish figures without changing Lab 1
+        uses: peaceiris/actions-gh-pages@v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ runner.temp }}/lab3-public
+          publish_branch: gh-pages
+          destination_dir: lab3/${{ github.run_id }}-${{ github.run_attempt }}
+          keep_files: true
+
+      - name: Show figures in Summary
+        env:
+          PUBLIC_DIR: ${{ runner.temp }}/lab3-public
+        run: |
+          printf '## ЛР3 — графики эксперимента\n\n' >> "$GITHUB_STEP_SUMMARY"
+          printf "[Markdown-отчёт](https://github.com/%s/blob/gh-pages/lab3/%s-%s/report.md)\n\n" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_STEP_SUMMARY"
+          for file in "$PUBLIC_DIR"/*.png; do
+            name="$(basename "$file")"
+            printf '![%s](https://raw.githubusercontent.com/%s/gh-pages/lab3/%s-%s/%s)\n\n' "$name" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$name" >> "$GITHUB_STEP_SUMMARY"
+          done
