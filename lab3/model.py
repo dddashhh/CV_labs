@@ -60,7 +60,7 @@ class ResShift:
         self.diffusion = instantiate(config.diffusion)
 
     @torch.inference_mode()
-    def restore(self, lr, mask, hr=None, seed=1234):
+    def restore(self, lr, mask, hr=None, seed=1234, repeats=1):
         mask = validate_mask(mask, lr.shape[:2])
         context = known_context(lr, mask, hr)
         if not mask.any():
@@ -73,7 +73,7 @@ class ResShift:
             tensor(context, self.device), self.autoencoder, up_sample=False)
         mask_hr = upscale_mask(mask)
         mask_z = latent_mask(mask_hr, z_lr.shape[-2:], self.device)
-        z = sample_masked(self.diffusion, self.model, z_lr, condition, mask_z, known, seed)
+        z = sample_masked(self.diffusion, self.model, z_lr, condition, mask_z, known, seed, repeats)
         prediction = self.diffusion.decode_first_stage(z, self.autoencoder)
         if not torch.isfinite(prediction).all():
             raise FloatingPointError('Non-finite model output')

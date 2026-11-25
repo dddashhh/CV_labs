@@ -22,10 +22,15 @@ def validate_mask(mask, shape):
 
 
 def masks(shape):
+    return {'zeros': np.zeros(shape, bool), 'ones': np.ones(shape, bool), 'mixed': circular_mask(shape, 50)}
+
+
+def circular_mask(shape, percent):
+    if not 0 < percent < 100:
+        raise ValueError('Expected a mask area between 0 and 100 percent')
     h, w = shape
     y, x = np.ogrid[:h, :w]
-    circle = ((y + 0.5 - h / 2) / h) ** 2 + ((x + 0.5 - w / 2) / w) ** 2 <= 0.5 / np.pi
-    return {'zeros': np.zeros(shape, bool), 'ones': np.ones(shape, bool), 'mixed': circle}
+    return ((y + 0.5 - h / 2) / h) ** 2 + ((x + 0.5 - w / 2) / w) ** 2 <= percent / (100 * np.pi)
 
 
 def upscale_mask(mask):

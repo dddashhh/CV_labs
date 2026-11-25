@@ -24,8 +24,14 @@ def known_path(diffusion, known, condition, seed):
     return path
 
 
+def forward_resample(state, condition, clean_estimate, delta, kappa, noise):
+    return state + delta * (condition - clean_estimate) + kappa * math.sqrt(delta) * noise
+
+
 @torch.inference_mode()
-def sample_masked(diffusion, model, condition, lr, mask, known, seed=1234):
+def sample_masked(diffusion, model, condition, lr, mask, known, seed=1234, repeats=1):
+    if not isinstance(repeats, int) or repeats < 1:
+        raise ValueError('repeats must be a positive integer')
     full = bool(mask.all())
     if not full and (known is None or known.shape != condition.shape):
         raise ValueError('Known latent is required for a non-full mask')
@@ -43,8 +49,16 @@ def sample_masked(diffusion, model, condition, lr, mask, known, seed=1234):
             state = torch.where(mask, state, path[-1])
         for i in reversed(range(diffusion.num_timesteps)):
             t = torch.full((condition.shape[0],), i, device=condition.device, dtype=torch.long)
-            state = diffusion.p_sample(model, state, condition, t, clip_denoised=False,
-                                       model_kwargs={'lq': lr})['sample']
-            if path is not None:
-                state = torch.where(mask, state, path[i])
+            count = repeats if path is not None and i > 0 else 1
+            for attempt in range(count):
+                output = diffusion.p_sample(model, state, condition, t, clip_denoised=False,
+                                            model_kwargs={'lq': lr})
+                state = output['sample']
+                if path is not None:
+                    state = torch.where(mask, state, path[i])
+                if attempt + 1 < count:
+                    delta = float(diffusion.etas[i] - diffusion.etas[i - 1])
+                    state = forward_resample(state, condition, output['pred_xstart'], delta,
+                                             diffusion.kappa, torch.randn_like(state))
+                    state = torch.where(mask, state, path[i + 1])
         return state

@@ -85,13 +85,23 @@ def main():
     parser.add_argument('--masks', nargs='+', choices=MASKS, default=MASKS)
     parser.add_argument('--device', default='cpu')
     parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--study', action='store_true')
+    parser.add_argument('--areas', nargs='+', type=int, choices=(10, 25, 50, 75), default=(10, 25, 50, 75))
+    parser.add_argument('--repeats', type=int, default=2)
     parser.add_argument('--baseline-only', action='store_true')
     parser.add_argument('--psnr-only', action='store_true')
     args = parser.parse_args()
-    out = args.out or ROOT / ('results/baseline' if args.baseline_only else 'results/experiment')
+    if args.study and (args.baseline_only or args.repeats < 2 or len(set(args.areas)) != len(args.areas)):
+        parser.error('Study requires distinct areas, repeats >= 2 and no baseline-only flag')
+    out = args.out or ROOT / ('results/study' if args.study else 'results/baseline' if args.baseline_only else 'results/experiment')
     data = args.data if args.data is not None else prepare_official(ROOT / 'data', args.ids, args.cache)
-    run(data, out, args.ids, args.degradations, args.masks, args.device, args.seed,
-        args.baseline_only, args.psnr_only)
+    if args.study:
+        from .study import run_study
+        run_study(data, out, args.ids, args.degradations, args.areas, args.device,
+                  args.seed, args.repeats, args.psnr_only)
+    else:
+        run(data, out, args.ids, args.degradations, args.masks, args.device, args.seed,
+            args.baseline_only, args.psnr_only)
 
 
 if __name__ == '__main__':

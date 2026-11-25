@@ -72,6 +72,25 @@ def junit_report(path):
             table(rows, (('Тест', 'name'), ('Статус', 'status'), ('Время, с', 'time'))) + '\n')
 
 
+STUDY_COLUMNS = COLUMNS + (('PSNR границы, дБ', 'psnr_boundary_db'), ('Доля маски', 'coverage'))
+PAIRED_COLUMNS = (
+    ('Деградация', 'degradation'), ('Маска, %', 'area_percent'), ('N', 'n'),
+    ('Mixed − Post, ROI дБ', 'mixed_vs_post_psnr_roi_db'),
+    ('RePaint − Post, ROI дБ', 'repaint_vs_post_psnr_roi_db'),
+    ('RePaint − Mixed, ROI дБ', 'repaint_vs_mixed_psnr_roi_db'),
+    ('RePaint > Mixed', 'repaint_vs_mixed_wins'),
+    ('RePaint − Mixed, граница дБ', 'repaint_vs_mixed_psnr_boundary_db'),
+    ('RePaint − Mixed, LPIPS', 'repaint_vs_mixed_lpips'),
+    ('RePaint − Mixed, CLIP-IQA', 'repaint_vs_mixed_clip_iqa'),
+    ('RePaint − Mixed, с', 'repaint_vs_mixed_seconds'),
+)
+STUDY_NOTE = ('Post-blend использует тот же результат Ones и известный HR только при финальной склейке. '
+              'Mixed использует HR на каждом обратном шаге; RePaint добавляет повторное зашумление. '
+              'Сравнение проводится при одинаковой маске, LR, HR и seed. '
+              'Для PSNR и CLIP-IQA положительная разность лучше, для LPIPS и времени — отрицательная. '
+              'PSNR ROI сравним между методами при одной площади. Нулевой режим — контроль, а не конкурент.')
+
+
 def experiment_report(out):
     summary = load(out / 'summary.csv')
     pairs = load(out / 'roi_comparison.csv')
@@ -82,6 +101,11 @@ def experiment_report(out):
             text += f'\nУспешно записано конфигураций: **{len(results)}**. Частичные результаты:\n\n'
             text += table(results, (('Изображение', 'image'),) + tuple(c for c in COLUMNS if c[1] != 'n')) + '\n'
         return text
+    if (out / 'paired_summary.csv').is_file():
+        return '\n\n'.join(['## ЛР3 — расширенный эксперимент', f'Выполнено конфигураций: **{len(results)}**.',
+                            STUDY_NOTE, '### Парные сравнения', table(load(out / 'paired_summary.csv'), PAIRED_COLUMNS),
+                            '### Средние метрики', table(summary, STUDY_COLUMNS),
+                            'Полные попарные результаты, изображения и графики доступны в Artifacts.']) + '\n'
     return '\n\n'.join([
         '## ЛР3 — SR-inpainting', f'Выполнено конфигураций: **{len(results)}**.',
         'Маски: zeros — эталон HR; ones — восстановление по LR; mixed — восстановление с HR-контекстом.',
@@ -99,13 +123,14 @@ def write_html(out):
     results = load(out / 'metrics.csv')
     metadata = out / 'run.json'
     figures = sorted((out / 'figures').glob('*.png'))
+    study = (out / 'paired_summary.csv').is_file()
     sections = [
         '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>ЛР3 — SR-inpainting</title>',
         '<style>body{font:16px system-ui,sans-serif;max-width:1200px;margin:32px auto;padding:0 20px;color:#172033}table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid #ccd4de;padding:7px;text-align:left}th{background:#edf2f7}img{max-width:100%;height:auto}figure{margin:24px 0}pre{white-space:pre-wrap}</style></head><body>',
         '<h1>ЛР3 — SR-inpainting</h1>', f'<p>Конфигураций: {len(results)}. Источник данных: DIV2K (NTIRE 2017).</p>',
-        '<h2>Средние метрики</h2>', table(summary, COLUMNS, 'html'),
-        '<h2>Сравнение на одинаковой ROI</h2>', table(pairs, ROI_COLUMNS, 'html'),
-        '<p>Положительный Δ означает преимущество HR-контекста. Нулевая маска возвращает HR и не оценивает качество восстановления.</p>',
+        '<h2>Средние метрики</h2>', table(summary, STUDY_COLUMNS if study else COLUMNS, 'html'),
+        '<h2>Сравнение на одинаковой ROI</h2>', table(load(out / 'paired_summary.csv'), PAIRED_COLUMNS, 'html') if study else table(pairs, ROI_COLUMNS, 'html'),
+        '<p>' + html.escape(STUDY_NOTE) + '</p>' if study else '<p>Положительный Δ означает преимущество HR-контекста. Нулевая маска возвращает HR и не оценивает качество восстановления.</p>',
         '<h2>Графики и изображения</h2>',
     ]
     for figure in figures:

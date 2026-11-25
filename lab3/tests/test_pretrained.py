@@ -27,8 +27,14 @@ def test_pretrained_cpu(div2k_data):
     changed = hr.copy()
     changed[upscale_mask(mask['mixed'])] ^= 255
     assert np.array_equal(mixed, model.restore(lr, mask['mixed'], hr=changed))
+    repaint = model.restore(lr, mask['mixed'], hr=hr, repeats=2)
+    assert repaint.shape == hr.shape
+    region = upscale_mask(mask['mixed'])
+    assert np.array_equal(repaint[~region], hr[~region])
+    assert np.array_equal(repaint, model.restore(lr, mask['mixed'], hr=changed, repeats=2))
     del model
     metrics = QualityMetrics('cpu')
-    scores = metrics.score(mixed, hr)
-    assert np.isfinite(scores['lpips'])
-    assert 0 <= scores['clip_iqa'] <= 1
+    for prediction in (mixed, repaint):
+        scores = metrics.score(prediction, hr)
+        assert np.isfinite(scores['lpips'])
+        assert 0 <= scores['clip_iqa'] <= 1

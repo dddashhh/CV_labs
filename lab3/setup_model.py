@@ -20,7 +20,7 @@ def download(url, path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--revision', default='journal')
+    parser.add_argument('--revision', default='bb03b7d21614cace01787e097c8a6ab6b945227d')
     args = parser.parse_args()
     repo = ROOT / 'ResShift'
     if not repo.exists():
